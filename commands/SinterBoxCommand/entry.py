@@ -96,10 +96,8 @@ def command_created(args: adsk.core.CommandCreatedEventArgs):
     selection_input.addSelectionFilter('Bodies')
     selection_input.setSelectionLimits(1, 0)
 
-    # TODO Handle preselected bodies?
     default_selections = []
 
-    # Get initialized bounding box, may really not be needed here...
     b_box = bounding_box_from_selections(default_selections)
 
     default_thickness = get_default_thickness()
