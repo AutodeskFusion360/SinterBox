@@ -14,7 +14,6 @@ DO_FULL_PREVIEW = False
 the_box: SinterBoxDefinition
 the_box = None
 
-# TODO *** Specify the command identity information. ***
 CMD_ID = f'{config.COMPANY_NAME}_{config.ADDIN_NAME}_sinterBox'
 CMD_NAME = 'SinterBox'
 CMD_Description = 'Create a Sinter Box for the selected geometry'
@@ -22,8 +21,7 @@ CMD_Description = 'Create a Sinter Box for the selected geometry'
 # Specify that the command will be promoted to the panel.
 IS_PROMOTED = False
 
-# TODO *** Define the location where the command button will be created. ***
-# This is done by specifying the workspace, the tab, and the panel, and the 
+# This is done by specifying the workspace, the tab, and the panel, and the
 # command it will be inserted beside. Not providing the command to position it
 # will insert it at the end.
 WORKSPACE_ID = 'FusionSolidEnvironment'
@@ -230,7 +228,7 @@ def mouse_drag_end(args: adsk.core.MouseEventArgs):
     command.doExecutePreview()
 
 
-# TODO Probably do this
+# TODO Maybe better checking
 def command_validate_input(args: adsk.core.ValidateInputsEventArgs):
     futil.log(f'{CMD_NAME} Validate Input Event')
     inputs = args.inputs
