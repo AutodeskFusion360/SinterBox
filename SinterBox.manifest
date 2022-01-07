@@ -1,0 +1,13 @@
+{
+	"autodeskProduct":	"Fusion360",
+	"type":	"addin",
+	"id":	"8cc51951-ba1d-46f3-8376-32aced3c8c58",
+	"author":	"Patrick Rainsberry",
+	"description":	{
+		"":	"Create a sinter box for use with powder bed 3D printers."
+	},
+	"version":	"1.0",
+	"runOnStartup":	false,
+	"supportedOS":	"windows|mac",
+	"editEnabled":	true
+}
