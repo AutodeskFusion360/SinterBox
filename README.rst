@@ -11,6 +11,12 @@ Usage
 Installation
 ------------
 
+Enhancement Ideas
+-----------------
+
+* Add save as defaults option
+* Rigorous input validations
+
 License
 -------
 `MIT License`_

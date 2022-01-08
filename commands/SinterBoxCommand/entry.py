@@ -169,7 +169,8 @@ def command_input_changed(args: adsk.core.InputChangedEventArgs):
     global DO_FULL_PREVIEW
 
     changed_input = args.input
-    inputs = args.inputs
+    command: adsk.core.Command = args.firingEvent.sender
+    inputs = command.commandInputs
     futil.log(f'{CMD_NAME} Input Changed Event fired from a change to {changed_input.id}')
 
     selection_input: adsk.core.SelectionCommandInput = inputs.itemById('body_select')
@@ -185,6 +186,8 @@ def command_input_changed(args: adsk.core.InputChangedEventArgs):
     gap_value = gap_input.value
     gap_minimum = thickness_value * 2
 
+    direction_group: adsk.core.GroupCommandInput = inputs.itemById('direction_group')
+
     full_preview_input: adsk.core.BoolValueCommandInput = inputs.itemById('full_preview_input')
     full_preview_value = full_preview_input.value
 
@@ -193,6 +196,12 @@ def command_input_changed(args: adsk.core.InputChangedEventArgs):
 
     if changed_input.id == 'body_select':
         if len(selections) > 0:
+            if direction_group is not None:
+                direction_input: adsk.core.DirectionCommandInput
+                for direction_input in direction_group.children:
+                    if not direction_input.isVisible:
+                        direction_input.isVisible = True
+
             the_box.selections = selections
             new_box = bounding_box_from_selections(selections)
             the_box.initialize_box(new_box)
@@ -240,6 +249,12 @@ def command_input_changed(args: adsk.core.InputChangedEventArgs):
 
             inputs.itemById('gap').value = new_gap
             the_box.feature_values.gap = new_gap
+        else:
+            if direction_group is not None:
+                direction_input: adsk.core.DirectionCommandInput
+                for direction_input in direction_group.children:
+                    if direction_input.isVisible:
+                        direction_input.isVisible = False
 
     elif changed_input.id == 'bar':
         the_box.feature_values.bar = bar_value
@@ -247,8 +262,10 @@ def command_input_changed(args: adsk.core.InputChangedEventArgs):
         the_box.feature_values.gap = gap_value
     elif changed_input.id == 'thick_input':
         the_box.feature_values.shell_thickness = thickness_value
-    # else:
-    #     DO_FULL_PREVIEW = False
+    elif changed_input.id == 'full_preview_input':
+        DO_FULL_PREVIEW = full_preview_value
+    else:
+        DO_FULL_PREVIEW = False
 
 
 def mouse_drag_end(args: adsk.core.MouseEventArgs):
