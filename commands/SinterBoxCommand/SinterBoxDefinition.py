@@ -52,19 +52,21 @@ class SinterBoxDefinition:
         self.gap_input = inputs.itemById('gap')
         self.bar_input = inputs.itemById('bar')
 
-        d_o = get_default_offset()
+        default_offset = get_default_offset()
         self.feature_values = FeatureValues(
-            self.thickness_input.value, self.bar_input.value, self.gap_input.value, *([d_o] * 6))
+            self.thickness_input.value, self.bar_input.value, self.gap_input.value, *([default_offset] * 6))
 
+        direction_group = inputs.addGroupCommandInput('direction_group', 'Offset Values')
         self.directions = {
-            "x_pos": Direction("X Positive", self.x_pos_vector, inputs, self.feature_values.x_pos),
-            "x_neg": Direction("X Negative", self.x_neg_vector, inputs, self.feature_values.x_neg),
-            "y_pos": Direction("Y Positive", self.y_pos_vector, inputs, self.feature_values.y_pos),
-            "y_neg": Direction("Y Negative", self.y_neg_vector, inputs, self.feature_values.y_neg),
-            "z_pos": Direction("Z Positive", self.z_pos_vector, inputs, self.feature_values.z_pos),
-            "z_neg": Direction("Z Negative", self.z_neg_vector, inputs, self.feature_values.z_neg)
+            "x_pos": Direction("X Positive", self.x_pos_vector, direction_group.children, self.feature_values.x_pos),
+            "x_neg": Direction("X Negative", self.x_neg_vector, direction_group.children, self.feature_values.x_neg),
+            "y_pos": Direction("Y Positive", self.y_pos_vector, direction_group.children, self.feature_values.y_pos),
+            "y_neg": Direction("Y Negative", self.y_neg_vector, direction_group.children, self.feature_values.y_neg),
+            "z_pos": Direction("Z Positive", self.z_pos_vector, direction_group.children, self.feature_values.z_pos),
+            "z_neg": Direction("Z Negative", self.z_neg_vector, direction_group.children, self.feature_values.z_neg)
         }
-
+        direction_group.isExpanded = False
+        
         self.graphics_group = root_comp.customGraphicsGroups.add()
         self.brep_mgr = adsk.fusion.TemporaryBRepManager.get()
         self.graphics_box = None
@@ -138,7 +140,7 @@ class SinterBoxDefinition:
             if entity.isValid:
                 entity.deleteMe()
 
-    def create_brep(self):
+    def create_brep(self) -> adsk.fusion.Occurrence:
         design: adsk.fusion.Design = app.activeProduct
         root_comp = design.rootComponent
 
@@ -162,3 +164,6 @@ class SinterBoxDefinition:
 
         else:
             new_comp.bRepBodies.add(shell_box)
+
+        return new_occ
+

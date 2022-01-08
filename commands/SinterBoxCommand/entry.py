@@ -84,7 +84,7 @@ def command_created(args: adsk.core.CommandCreatedEventArgs):
     futil.add_handler(args.command.execute, command_execute, local_handlers=local_handlers)
     futil.add_handler(args.command.inputChanged, command_input_changed, local_handlers=local_handlers)
     futil.add_handler(args.command.executePreview, command_preview, local_handlers=local_handlers)
-    futil.add_handler(args.command.validateInputs, command_validate_input, local_handlers=local_handlers)
+    # futil.add_handler(args.command.validateInputs, command_validate_input, local_handlers=local_handlers)
     futil.add_handler(args.command.mouseDragEnd, mouse_drag_end, local_handlers=local_handlers)
     futil.add_handler(args.command.destroy, command_destroy, local_handlers=local_handlers)
 
@@ -107,11 +107,12 @@ def command_created(args: adsk.core.CommandCreatedEventArgs):
     bar_input = adsk.core.ValueInput.createByReal(.2)
 
     inputs.addValueInput('thick_input', "Cage Thickness", units, thickness_input)
-
     inputs.addValueInput('gap', "Bar Spacing", units, gap_input)
     inputs.addValueInput('bar', "Bar Width", units, bar_input)
 
-    # Create main box class
+    inputs.addBoolValueInput('full_preview_input', 'Do Full Preview', True, '', True)
+    inputs.addBoolValueInput('new_component_input', 'Move Bodies to New Component', True, '', True)
+
     the_box = SinterBoxDefinition(b_box, inputs)
 
 
@@ -119,8 +120,18 @@ def command_created(args: adsk.core.CommandCreatedEventArgs):
 # is immediately called after the created event not command inputs were created for the dialog.
 def command_execute(args: adsk.core.CommandEventArgs):
     futil.log(f'{CMD_NAME} Command Execute Event')
+    inputs = args.command.commandInputs
+    selection_input: adsk.core.SelectionCommandInput = inputs.itemById('body_select')
+    new_component_input: adsk.core.BoolValueCommandInput = inputs.itemById('new_component_input')
+    selection_bodies = [selection_input.selection(i).entity for i in range(selection_input.selectionCount)]
+
     the_box.clear_graphics()
-    the_box.create_brep()
+    new_occurrence = the_box.create_brep()
+
+    if new_component_input.value:
+        body: adsk.fusion.BRepBody
+        for body in selection_bodies:
+            body.moveToComponent(new_occurrence)
 
 
 # This event handler is called when the command needs to compute a new preview in the graphics window.
@@ -156,7 +167,7 @@ def command_preview(args: adsk.core.CommandEventArgs):
 # allowing you to modify values of other inputs based on that change.
 def command_input_changed(args: adsk.core.InputChangedEventArgs):
     global DO_FULL_PREVIEW
-    DO_FULL_PREVIEW = True
+
     changed_input = args.input
     inputs = args.inputs
     futil.log(f'{CMD_NAME} Input Changed Event fired from a change to {changed_input.id}')
@@ -172,7 +183,13 @@ def command_input_changed(args: adsk.core.InputChangedEventArgs):
 
     gap_input: adsk.core.ValueCommandInput = inputs.itemById('gap')
     gap_value = gap_input.value
-    gap_limit = thickness_value * 2
+    gap_minimum = thickness_value * 2
+
+    full_preview_input: adsk.core.BoolValueCommandInput = inputs.itemById('full_preview_input')
+    full_preview_value = full_preview_input.value
+
+    if full_preview_value:
+        DO_FULL_PREVIEW = True
 
     if changed_input.id == 'body_select':
         if len(selections) > 0:
@@ -182,29 +199,44 @@ def command_input_changed(args: adsk.core.InputChangedEventArgs):
             the_box.update_manipulators()
             o_box = oriented_b_box_from_b_box(new_box)
 
-            min_gaps = []
-            for side in [o_box.length, o_box.width, o_box.height]:
-                min_gap = side * .9
-                if min_gap > gap_limit:
-                    min_gaps.append(min_gap)
+            main_box_max_gaps = []
+            sides = [o_box.length, o_box.width, o_box.height]
 
-            if len(min_gaps) > 0:
-                most_min_gap = min(min_gaps)
+            for main_box_side in [o_box.length, o_box.width, o_box.height]:
+                main_box_side_gap = main_box_side * .9
+                if main_box_side_gap > gap_minimum:
+                    main_box_max_gaps.append(main_box_side_gap)
+
+            if len(main_box_max_gaps) > 0:
+                main_box_max_gap = min(main_box_max_gaps)
             else:
-                most_min_gap = thickness_value
+                main_box_max_gap = thickness_value
 
-            four_gaps = (side - bar_value * 3) / 4
-            three_gaps = (side - bar_value * 2) / 3
-            two_gaps = (side - bar_value) / 2
+            body_max_gaps = []
+            body: adsk.fusion.BRepBody
+            for body in selections:
+                body_o_box = oriented_b_box_from_b_box(body.boundingBox)
+                max_side = max(body_o_box.length, body_o_box.width, body_o_box.height)
+                max_side_gap = max_side * .9
+                body_max_gaps.append(max_side_gap)
 
-            if four_gaps > gap_limit:
-                new_gap = four_gaps
-            elif three_gaps > gap_limit:
-                new_gap = three_gaps
-            elif two_gaps > gap_limit:
+            body_gap_maximum = min(body_max_gaps)
+
+            short_side = min(sides)
+            four_gaps = (short_side - bar_value * 3) / 4
+            three_gaps = (short_side - bar_value * 2) / 3
+            two_gaps = (short_side - bar_value) / 2
+
+            if body_gap_maximum > main_box_max_gap:
+                new_gap = main_box_max_gap
+            elif (body_gap_maximum > two_gaps) and (two_gaps > gap_minimum):
                 new_gap = two_gaps
+            elif (body_gap_maximum > three_gaps) and (three_gaps > gap_minimum):
+                new_gap = three_gaps
+            elif (body_gap_maximum > four_gaps) and (four_gaps > gap_minimum):
+                new_gap = four_gaps
             else:
-                new_gap = most_min_gap
+                new_gap = body_gap_maximum
 
             inputs.itemById('gap').value = new_gap
             the_box.feature_values.gap = new_gap
@@ -215,30 +247,38 @@ def command_input_changed(args: adsk.core.InputChangedEventArgs):
         the_box.feature_values.gap = gap_value
     elif changed_input.id == 'thick_input':
         the_box.feature_values.shell_thickness = thickness_value
-    else:
-        DO_FULL_PREVIEW = False
+    # else:
+    #     DO_FULL_PREVIEW = False
 
 
 def mouse_drag_end(args: adsk.core.MouseEventArgs):
     global DO_FULL_PREVIEW
-    DO_FULL_PREVIEW = True
-    command = args.firingEvent.sender
+
+    command: adsk.core.Command = args.firingEvent.sender
+    inputs = command.commandInputs
+
+    full_preview_input: adsk.core.BoolValueCommandInput = inputs.itemById('full_preview_input')
+    full_preview_value = full_preview_input.value
+
+    if full_preview_value:
+        DO_FULL_PREVIEW = True
+
     command.doExecutePreview()
 
 
-# TODO Maybe better checking
-def command_validate_input(args: adsk.core.ValidateInputsEventArgs):
-    futil.log(f'{CMD_NAME} Validate Input Event')
-    inputs = args.inputs
-    
-    # Verify the validity of the input values. This controls if the OK button is enabled or not.
-    gap_input: adsk.core.ValueCommandInput = inputs.itemById('gap')
-    bar_input: adsk.core.ValueCommandInput = inputs.itemById('bar')
-    thick_input: adsk.core.ValueCommandInput = inputs.itemById('thick_input')
-    if (gap_input.value >= 0) and (bar_input.value >= 0) and (thick_input.value >= 0):
-        inputs.areInputsValid = True
-    else:
-        inputs.areInputsValid = False
+# # TODO Maybe better checking
+# def command_validate_input(args: adsk.core.ValidateInputsEventArgs):
+#     futil.log(f'{CMD_NAME} Validate Input Event')
+#     inputs = args.inputs
+#
+#     # Verify the validity of the input values. This controls if the OK button is enabled or not.
+#     gap_input: adsk.core.ValueCommandInput = inputs.itemById('gap')
+#     bar_input: adsk.core.ValueCommandInput = inputs.itemById('bar')
+#     thick_input: adsk.core.ValueCommandInput = inputs.itemById('thick_input')
+#     if (gap_input.value >= 0) and (bar_input.value >= 0) and (thick_input.value >= 0):
+#         inputs.areInputsValid = True
+#     else:
+#         inputs.areInputsValid = False
         
 
 # This event handler is called when the command terminates.
