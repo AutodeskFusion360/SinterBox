@@ -101,6 +101,16 @@ class SinterBoxDefinition:
             middle(min_p.x, max_p.x), middle(min_p.y, max_p.y), min_p.z)
         )
 
+    def expand_box_in_directions(self):
+        direction: Direction
+        for key, direction in self.directions.items():
+            point = direction.dist_input.manipulatorOrigin.copy()
+            vector = direction.direction.copy()
+            vector.normalize()
+            vector.scaleBy(direction.dist_input.value)
+            point.translateBy(vector)
+            self.update_box(point)
+
     def box_center(self):
         return mid_point(self.modified_b_box.minPoint, self.modified_b_box.maxPoint)
 
@@ -146,7 +156,7 @@ class SinterBoxDefinition:
 
         new_occ: adsk.fusion.Occurrence = root_comp.occurrences.addNewComponent(adsk.core.Matrix3D.create())
         new_comp = new_occ.component
-        new_comp.name = "Sinter Box"
+        new_comp.name = "Cage"
 
         shell_box = create_brep_shell_box(self.modified_b_box, self.thickness_input.value)
 

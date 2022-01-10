@@ -1,8 +1,10 @@
+import math
+
 import adsk.core
 import adsk.fusion
 import os
 
-from .SinterBoxUtils import oriented_b_box_from_b_box, bounding_box_from_selections, get_default_thickness
+from .SinterBoxUtils import oriented_b_box_from_b_box, bounding_box_from_selections, get_default_thickness, auto_gaps
 from .SinterBoxDefinition import Direction, SinterBoxDefinition
 from ...lib import fusion360utils as futil
 from ... import config
@@ -11,6 +13,8 @@ app = adsk.core.Application.get()
 ui = app.userInterface
 
 DO_FULL_PREVIEW = False
+AUTO_SIZE_GAPS = True
+
 the_box: SinterBoxDefinition
 the_box = None
 
@@ -94,6 +98,7 @@ def command_created(args: adsk.core.CommandCreatedEventArgs):
 
     selection_input = inputs.addSelectionInput('body_select', "Input Bodies", "Bodies for Bounding Box")
     selection_input.addSelectionFilter('Bodies')
+    # selection_input.addSelectionFilter('MeshBodies')
     selection_input.setSelectionLimits(1, 0)
 
     default_selections = []
@@ -107,12 +112,14 @@ def command_created(args: adsk.core.CommandCreatedEventArgs):
     bar_input = adsk.core.ValueInput.createByReal(.2)
 
     inputs.addValueInput('thick_input', "Cage Thickness", units, thickness_input)
-    inputs.addValueInput('gap', "Bar Spacing", units, gap_input)
     inputs.addValueInput('bar', "Bar Width", units, bar_input)
-
-    inputs.addBoolValueInput('full_preview_input', 'Do Full Preview', True, '', True)
     inputs.addBoolValueInput('new_component_input', 'Move Bodies to New Component', True, '', True)
 
+    inputs.addBoolValueInput('auto_gaps_input', 'Automatic Bar Spacing', True, '', True)
+    gap_input = inputs.addValueInput('gap', "Bar Spacing", units, gap_input)
+    gap_input.isEnabled = False
+
+    inputs.addBoolValueInput('full_preview_input', 'Preview', True, '', True)
     the_box = SinterBoxDefinition(b_box, inputs)
 
 
@@ -146,15 +153,7 @@ def command_preview(args: adsk.core.CommandEventArgs):
     if len(selections) > 0:
         new_box = bounding_box_from_selections(selections)
         the_box.initialize_box(new_box)
-
-        direction: Direction
-        for key, direction in the_box.directions.items():
-            point = direction.dist_input.manipulatorOrigin.copy()
-            vector = direction.direction.copy()
-            vector.normalize()
-            vector.scaleBy(direction.dist_input.value)
-            point.translateBy(vector)
-            the_box.update_box(point)
+        the_box.expand_box_in_directions()
 
         if DO_FULL_PREVIEW:
             the_box.update_graphics_full()
@@ -167,6 +166,7 @@ def command_preview(args: adsk.core.CommandEventArgs):
 # allowing you to modify values of other inputs based on that change.
 def command_input_changed(args: adsk.core.InputChangedEventArgs):
     global DO_FULL_PREVIEW
+    global AUTO_SIZE_GAPS
 
     changed_input = args.input
     command: adsk.core.Command = args.firingEvent.sender
@@ -184,12 +184,14 @@ def command_input_changed(args: adsk.core.InputChangedEventArgs):
 
     gap_input: adsk.core.ValueCommandInput = inputs.itemById('gap')
     gap_value = gap_input.value
-    gap_minimum = thickness_value * 2
 
     direction_group: adsk.core.GroupCommandInput = inputs.itemById('direction_group')
 
     full_preview_input: adsk.core.BoolValueCommandInput = inputs.itemById('full_preview_input')
     full_preview_value = full_preview_input.value
+
+    auto_gaps_input: adsk.core.BoolValueCommandInput = inputs.itemById('auto_gaps_input')
+    auto_gaps_value = auto_gaps_input.value
 
     if full_preview_value:
         DO_FULL_PREVIEW = True
@@ -206,49 +208,12 @@ def command_input_changed(args: adsk.core.InputChangedEventArgs):
             new_box = bounding_box_from_selections(selections)
             the_box.initialize_box(new_box)
             the_box.update_manipulators()
-            o_box = oriented_b_box_from_b_box(new_box)
+            the_box.expand_box_in_directions()
 
-            main_box_max_gaps = []
-            sides = [o_box.length, o_box.width, o_box.height]
-
-            for main_box_side in [o_box.length, o_box.width, o_box.height]:
-                main_box_side_gap = main_box_side * .9
-                if main_box_side_gap > gap_minimum:
-                    main_box_max_gaps.append(main_box_side_gap)
-
-            if len(main_box_max_gaps) > 0:
-                main_box_max_gap = min(main_box_max_gaps)
-            else:
-                main_box_max_gap = thickness_value
-
-            body_max_gaps = []
-            body: adsk.fusion.BRepBody
-            for body in selections:
-                body_o_box = oriented_b_box_from_b_box(body.boundingBox)
-                max_side = max(body_o_box.length, body_o_box.width, body_o_box.height)
-                max_side_gap = max_side * .9
-                body_max_gaps.append(max_side_gap)
-
-            body_gap_maximum = min(body_max_gaps)
-
-            short_side = min(sides)
-            four_gaps = (short_side - bar_value * 3) / 4
-            three_gaps = (short_side - bar_value * 2) / 3
-            two_gaps = (short_side - bar_value) / 2
-
-            if body_gap_maximum > main_box_max_gap:
-                new_gap = main_box_max_gap
-            elif (body_gap_maximum > two_gaps) and (two_gaps > gap_minimum):
-                new_gap = two_gaps
-            elif (body_gap_maximum > three_gaps) and (three_gaps > gap_minimum):
-                new_gap = three_gaps
-            elif (body_gap_maximum > four_gaps) and (four_gaps > gap_minimum):
-                new_gap = four_gaps
-            else:
-                new_gap = body_gap_maximum
-
-            inputs.itemById('gap').value = new_gap
-            the_box.feature_values.gap = new_gap
+            if AUTO_SIZE_GAPS:
+                new_gap = auto_gaps(selections, the_box.modified_b_box, thickness_value, bar_value)
+                gap_input.value = new_gap
+                the_box.feature_values.gap = new_gap
         else:
             if direction_group is not None:
                 direction_input: adsk.core.DirectionCommandInput
@@ -264,6 +229,16 @@ def command_input_changed(args: adsk.core.InputChangedEventArgs):
         the_box.feature_values.shell_thickness = thickness_value
     elif changed_input.id == 'full_preview_input':
         DO_FULL_PREVIEW = full_preview_value
+    elif changed_input.id == 'auto_gaps_input':
+        AUTO_SIZE_GAPS = auto_gaps_value
+        if AUTO_SIZE_GAPS:
+            gap_input.isEnabled = False
+            if len(selections) > 0:
+                new_gap = auto_gaps(selections, the_box.modified_b_box, thickness_value, bar_value)
+                gap_input.value = new_gap
+                the_box.feature_values.gap = new_gap
+        else:
+            gap_input.isEnabled = True
     else:
         DO_FULL_PREVIEW = False
 
@@ -296,7 +271,7 @@ def mouse_drag_end(args: adsk.core.MouseEventArgs):
 #         inputs.areInputsValid = True
 #     else:
 #         inputs.areInputsValid = False
-        
+
 
 # This event handler is called when the command terminates.
 def command_destroy(args: adsk.core.CommandEventArgs):
@@ -304,3 +279,4 @@ def command_destroy(args: adsk.core.CommandEventArgs):
     futil.log(f'{CMD_NAME} Command Destroy Event')
     the_box.clear_graphics()
     local_handlers = []
+
