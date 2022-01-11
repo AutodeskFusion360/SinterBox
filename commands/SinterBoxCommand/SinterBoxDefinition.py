@@ -1,7 +1,7 @@
 import adsk.core
 import adsk.fusion
 
-import config
+from ... import config
 from .SinterBoxUtils import get_default_offset, middle, mid_point, create_brep_shell_box, create_gaps, FeatureValues
 
 app = adsk.core.Application.get()

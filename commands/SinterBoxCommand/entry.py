@@ -19,8 +19,11 @@ the_box: SinterBoxDefinition
 the_box = None
 
 CMD_ID = f'{config.COMPANY_NAME}_{config.ADDIN_NAME}_sinterBox'
-CMD_NAME = 'SinterBox'
-CMD_Description = 'Creates a rectangular sinter box enclosing the selected geometry.'
+CMD_NAME = 'Sinterbox'
+CMD_Description = 'Creates a rectangular sinterbox enclosing the selected geometry for 3D Printing with Selective ' \
+                  'Laser Sintering (SLS) or Multi Jet Fusion (MJF).<br><br>' \
+                  'Select the solid bodies to enclose then specify the dimensions of the sinterbox. ' \
+                  'Use Move Bodies To New Component to consolidate all bodies in the same component. '
 
 # Specify that the command will be promoted to the panel.
 IS_PROMOTED = False
@@ -44,7 +47,7 @@ local_handlers = []
 def start():
     # Create a command Definition.
     cmd_def = ui.commandDefinitions.addButtonDefinition(CMD_ID, CMD_NAME, CMD_Description, ICON_FOLDER)
-    cmd_def.toolClipFilename = os.path.join(ICON_FOLDER, 'SinterBox_Tooltip_1.png')
+    cmd_def.toolClipFilename = os.path.join(ICON_FOLDER, 'Sinterbox_Tooltip.png')
 
     # Define an event handler for the command created event. It will be called when the button is clicked.
     futil.add_handler(cmd_def.commandCreated, command_created)
