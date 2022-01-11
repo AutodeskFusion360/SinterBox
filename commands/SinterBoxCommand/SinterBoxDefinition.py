@@ -1,6 +1,7 @@
 import adsk.core
 import adsk.fusion
 
+import config
 from .SinterBoxUtils import get_default_offset, middle, mid_point, create_brep_shell_box, create_gaps, FeatureValues
 
 app = adsk.core.Application.get()
@@ -156,7 +157,7 @@ class SinterBoxDefinition:
 
         new_occ: adsk.fusion.Occurrence = root_comp.occurrences.addNewComponent(adsk.core.Matrix3D.create())
         new_comp = new_occ.component
-        new_comp.name = "Cage"
+        new_comp.name = config.DEFAULT_COMPONENT_NAME
 
         shell_box = create_brep_shell_box(self.modified_b_box, self.thickness_input.value)
 

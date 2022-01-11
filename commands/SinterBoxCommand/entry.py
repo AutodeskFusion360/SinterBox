@@ -20,7 +20,7 @@ the_box = None
 
 CMD_ID = f'{config.COMPANY_NAME}_{config.ADDIN_NAME}_sinterBox'
 CMD_NAME = 'SinterBox'
-CMD_Description = 'Create a Sinter Box for the selected geometry'
+CMD_Description = 'Creates a rectangular sinter box enclosing the selected geometry.'
 
 # Specify that the command will be promoted to the panel.
 IS_PROMOTED = False
@@ -44,6 +44,7 @@ local_handlers = []
 def start():
     # Create a command Definition.
     cmd_def = ui.commandDefinitions.addButtonDefinition(CMD_ID, CMD_NAME, CMD_Description, ICON_FOLDER)
+    cmd_def.toolClipFilename = os.path.join(ICON_FOLDER, 'SinterBox_Tooltip_1.png')
 
     # Define an event handler for the command created event. It will be called when the button is clicked.
     futil.add_handler(cmd_def.commandCreated, command_created)
@@ -106,20 +107,22 @@ def command_created(args: adsk.core.CommandCreatedEventArgs):
     b_box = bounding_box_from_selections(default_selections)
 
     default_thickness = get_default_thickness()
-    thickness_input = adsk.core.ValueInput.createByReal(default_thickness)
+    default_thickness_value = adsk.core.ValueInput.createByReal(default_thickness)
 
-    gap_input = adsk.core.ValueInput.createByReal(2)
-    bar_input = adsk.core.ValueInput.createByReal(.2)
+    default_gap_value = adsk.core.ValueInput.createByReal(default_thickness * 4)
+    default_bar_value = adsk.core.ValueInput.createByReal(default_thickness * 2)
 
-    inputs.addValueInput('thick_input', "Cage Thickness", units, thickness_input)
-    inputs.addValueInput('bar', "Bar Width", units, bar_input)
-    inputs.addBoolValueInput('new_component_input', 'Move Bodies to New Component', True, '', True)
+    inputs.addValueInput('thick_input', "Cage Thickness", units, default_thickness_value)
+    inputs.addValueInput('bar', "Bar Width", units, default_bar_value)
 
     inputs.addBoolValueInput('auto_gaps_input', 'Automatic Bar Spacing', True, '', True)
-    gap_input = inputs.addValueInput('gap', "Bar Spacing", units, gap_input)
+    gap_input = inputs.addValueInput('gap', "Bar Spacing", units, default_gap_value)
     gap_input.isEnabled = False
 
     inputs.addBoolValueInput('full_preview_input', 'Preview', True, '', True)
+
+    inputs.addBoolValueInput('new_component_input', 'Move Bodies to New Component', True, '', True)
+
     the_box = SinterBoxDefinition(b_box, inputs)
 
 
