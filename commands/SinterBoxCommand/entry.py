@@ -31,7 +31,7 @@ IS_PROMOTED = False
 # This is done by specifying the workspace, the tab, and the panel, and the
 # command it will be inserted beside. Not providing the command to position it
 # will insert it at the end.
-WORKSPACE_ID = 'FusionSolidEnvironment'
+WORKSPACE_IDS = ['FusionSolidEnvironment', 'MfgWorkingModelEnv', 'SimplifyWMEnv']
 PANEL_ID = 'SolidCreatePanel'
 COMMAND_BESIDE_ID = 'PrimitivePipe'
 
@@ -53,34 +53,38 @@ def start():
     futil.add_handler(cmd_def.commandCreated, command_created)
 
     # ******** Add a button into the UI so the user can run the command. ********
-    # Get the target workspace the button will be created in.
-    workspace = ui.workspaces.itemById(WORKSPACE_ID)
 
-    # Get the panel the button will be created in.
-    panel = workspace.toolbarPanels.itemById(PANEL_ID)
+    for WORKSPACE_ID in WORKSPACE_IDS:
+        # Get the target workspace the button will be created in.
+        workspace = ui.workspaces.itemById(WORKSPACE_ID)
 
-    # Create the button command control in the UI after the specified existing command.
-    control = panel.controls.addCommand(cmd_def, COMMAND_BESIDE_ID, False)
+        # Get the panel the button will be created in.
+        panel = workspace.toolbarPanels.itemById(PANEL_ID)
 
-    # Specify if the command is promoted to the main toolbar. 
-    control.isPromoted = IS_PROMOTED
+        # Create the button command control in the UI after the specified existing command.
+        control = panel.controls.addCommand(cmd_def, COMMAND_BESIDE_ID, False)
+
+        # Specify if the command is promoted to the main toolbar.
+        control.isPromoted = IS_PROMOTED
 
 
 # Executed when add-in is stopped.
 def stop():
-    # Get the various UI elements for this command
-    workspace = ui.workspaces.itemById(WORKSPACE_ID)
-    panel = workspace.toolbarPanels.itemById(PANEL_ID)
-    command_control = panel.controls.itemById(CMD_ID)
-    command_definition = ui.commandDefinitions.itemById(CMD_ID)
 
-    # Delete the button command control
-    if command_control:
-        command_control.deleteMe()
+    for WORKSPACE_ID in WORKSPACE_IDS:
+        # Get the various UI elements for this command
+        workspace = ui.workspaces.itemById(WORKSPACE_ID)
+        panel = workspace.toolbarPanels.itemById(PANEL_ID)
+        command_control = panel.controls.itemById(CMD_ID)
+        command_definition = ui.commandDefinitions.itemById(CMD_ID)
 
-    # Delete the command definition
-    if command_definition:
-        command_definition.deleteMe()
+        # Delete the button command control
+        if command_control:
+            command_control.deleteMe()
+
+        # Delete the command definition
+        if command_definition:
+            command_definition.deleteMe()
 
 
 # Function that is called when a user clicks the corresponding button in the UI.
@@ -138,13 +142,27 @@ def command_execute(args: adsk.core.CommandEventArgs):
     new_component_input: adsk.core.BoolValueCommandInput = inputs.itemById('new_component_input')
     selection_bodies = [selection_input.selection(i).entity for i in range(selection_input.selectionCount)]
 
+    design: adsk.fusion.Design = app.activeProduct
+    root_comp = design.rootComponent
+    group_start_index = 0
+    group_end_index = 0
+
+    if design.designType == adsk.fusion.DesignTypes.ParametricDesignType:
+        group_start_index = design.timeline.markerPosition
+
     the_box.clear_graphics()
     new_occurrence = the_box.create_brep()
 
     if new_component_input.value:
         body: adsk.fusion.BRepBody
         for body in selection_bodies:
-            body.moveToComponent(new_occurrence)
+            body.copyToComponent(new_occurrence)
+        for body in selection_bodies:
+            remove_feature = root_comp.features.removeFeatures.add(body)
+            if design.designType == adsk.fusion.DesignTypes.ParametricDesignType:
+                group_end_index = remove_feature.timelineObject.index
+
+    design.timeline.timelineGroups.add(group_start_index, group_end_index)
 
 
 # This event handler is called when the command needs to compute a new preview in the graphics window.
@@ -245,6 +263,8 @@ def command_input_changed(args: adsk.core.InputChangedEventArgs):
                 the_box.feature_values.gap = new_gap
         else:
             gap_input.isEnabled = True
+    elif changed_input.id == 'direction_group':
+        ...
     else:
         DO_FULL_PREVIEW = False
 
