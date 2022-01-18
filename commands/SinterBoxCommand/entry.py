@@ -28,10 +28,12 @@ CMD_Description = 'Creates a rectangular sinterbox enclosing the selected geomet
 # Specify that the command will be promoted to the panel.
 IS_PROMOTED = False
 
-# This is done by specifying the workspace, the tab, and the panel, and the
-# command it will be inserted beside. Not providing the command to position it
-# will insert it at the end.
-WORKSPACE_IDS = ['FusionSolidEnvironment', 'MfgWorkingModelEnv', 'SimplifyWMEnv']
+# This line would add the command to Working Model and Simplify workspaces.
+# There are currently some issues and this will be enabled in a future version.
+# WORKSPACE_IDS = ['FusionSolidEnvironment', 'MfgWorkingModelEnv', 'SimplifyWMEnv']
+WORKSPACE_IDS = ['FusionSolidEnvironment']
+
+# The Panel and Pipe command are the same in all environments.
 PANEL_ID = 'SolidCreatePanel'
 COMMAND_BESIDE_ID = 'PrimitivePipe'
 
