@@ -6,7 +6,7 @@
 	"description":	{
 		"":	"Create a sinter box for use with powder bed 3D printers."
 	},
-	"version":	"1.0",
+	"version":	"1.2",
 	"runOnStartup":	false,
 	"supportedOS":	"windows|mac",
 	"editEnabled":	true
