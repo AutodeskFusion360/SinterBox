@@ -6,7 +6,6 @@ import adsk.core
 import adsk.fusion
 
 from ... import config
-from ...lib import fusion360utils as futil
 
 app = adsk.core.Application.get()
 ui = app.userInterface
@@ -38,7 +37,7 @@ def mid_point(p1: adsk.core.Point3D, p2: adsk.core.Point3D) -> adsk.core.Point3D
 
 
 def oriented_b_box_from_b_box(b_box: adsk.core.BoundingBox3D) -> adsk.core.OrientedBoundingBox3D:
-    design: adsk.fusion.Design = app.activeProduct
+    design = get_design()
     root_comp = design.rootComponent
 
     o_box = adsk.core.OrientedBoundingBox3D.create(
@@ -93,7 +92,6 @@ def create_gaps(b_box: adsk.core.BoundingBox3D, feature_values: FeatureValues) -
     create_o_box = adsk.core.OrientedBoundingBox3D.create
     create_point = adsk.core.Point3D.create
 
-    # if (o_box.length - bar - gap - thk * 2) > 0:
     if (o_box.length - gap) >= 0:
         x_num = int(math.floor((o_box.length + bar) / (gap + bar)))
         x_step = (o_box.length - (gap * x_num) - (bar * (x_num - 1))) / 2
@@ -101,7 +99,6 @@ def create_gaps(b_box: adsk.core.BoundingBox3D, feature_values: FeatureValues) -
         x_num = 0
         x_step = 0
 
-    # if (o_box.width - bar - gap - thk * 2) > 0:
     if (o_box.width - gap) >= 0:
         y_num = int(math.floor((o_box.width + bar) / (gap + bar)))
         y_step = (o_box.width - (gap * y_num) - (bar * (y_num - 1))) / 2
@@ -109,7 +106,6 @@ def create_gaps(b_box: adsk.core.BoundingBox3D, feature_values: FeatureValues) -
         y_num = 0
         y_step = 0
 
-    # if (o_box.height - bar - gap - thk * 2) > 0:
     if (o_box.height - gap) >= 0:
         z_num = int(math.floor((o_box.height + bar) / (gap + bar)))
         z_step = (o_box.height - (gap * z_num) - (bar * (z_num - 1))) / 2
@@ -134,7 +130,6 @@ def create_gaps(b_box: adsk.core.BoundingBox3D, feature_values: FeatureValues) -
             cp_x = create_point(
                 o_box.centerPoint.x + (o_box.length + thk) / 2, y_min + y * (bar + gap), z_min + z * (bar + gap))
             x_box = create_o_box(cp_x, o_box.lengthDirection, o_box.widthDirection, thk, gap, gap)
-            # x_box = create_o_box(cp_x, o_box.lengthDirection, o_box.widthDirection, o_box.length + thk * 2, gap, gap)
             gaps.append(brep_mgr.createBox(x_box))
 
     for z in range(z_num):
@@ -165,7 +160,7 @@ def create_gaps(b_box: adsk.core.BoundingBox3D, feature_values: FeatureValues) -
 
 
 def get_default_offset():
-    design: adsk.fusion.Design = app.activeProduct
+    design = get_design()
     units = design.unitsManager.defaultLengthUnits
     try:
         if units in [adsk.fusion.DistanceUnits.InchDistanceUnits, adsk.fusion.DistanceUnits.FootDistanceUnits]:
@@ -181,7 +176,7 @@ def get_default_offset():
 
 
 def get_default_thickness():
-    design: adsk.fusion.Design = app.activeProduct
+    design = get_design()
     units = design.fusionUnitsManager.distanceDisplayUnits
     try:
         if units in [adsk.fusion.DistanceUnits.InchDistanceUnits, adsk.fusion.DistanceUnits.FootDistanceUnits]:
@@ -192,7 +187,6 @@ def get_default_thickness():
     except AttributeError:
         default_shell = f"1 {units}"
 
-    design: adsk.fusion.Design = app.activeProduct
     default_value = design.unitsManager.evaluateExpression(default_shell)
     return default_value
 
@@ -204,10 +198,6 @@ def auto_gaps(selections, modified_b_box, thickness_value, bar_value):
     sides = [o_box.length, o_box.width, o_box.height]
 
     for main_box_side in [o_box.length, o_box.width, o_box.height]:
-        # main_box_side_gap = main_box_side * .9
-        # if main_box_side_gap > gap_minimum:
-        #     main_box_max_gaps.append(main_box_side_gap)
-
         if main_box_side > gap_minimum:
             main_box_max_gaps.append(main_box_side)
 
@@ -215,8 +205,6 @@ def auto_gaps(selections, modified_b_box, thickness_value, bar_value):
         main_box_max_gap = min(main_box_max_gaps)
     else:
         main_box_max_gap = thickness_value
-
-    futil.log(f'main_box_max_gap +{str(main_box_max_gap)}')
 
     body_max_gaps = []
     body: adsk.fusion.BRepBody
@@ -231,14 +219,9 @@ def auto_gaps(selections, modified_b_box, thickness_value, bar_value):
         max_side_gap = max_side * .9
         body_max_gaps.append(max_side_gap)
 
-        futil.log(body.parentComponent.name)
-        futil.log(str(max_side_gap))
-
-    futil.log(f'body_max_gaps + {str(body_max_gaps)}')
     body_gap_maximum = min(body_max_gaps)
-
     short_side = min(sides)
-    futil.log(f'short_side +{str(short_side)}')
+
     four_gaps = (short_side - bar_value * 3) / 4
     three_gaps = (short_side - bar_value * 2) / 3
     two_gaps = (short_side - bar_value) / 2
@@ -255,6 +238,10 @@ def auto_gaps(selections, modified_b_box, thickness_value, bar_value):
         new_gap = four_gaps
     else:
         new_gap = body_gap_maximum
-    futil.log(f'new_gap +{str(new_gap)}')
     return new_gap
+
+
+def get_design() -> adsk.fusion.Design:
+    design = app.activeDocument.products.itemByProductType('DesignProductType')
+    return design
 

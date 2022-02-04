@@ -2,7 +2,8 @@ import adsk.core
 import adsk.fusion
 
 from ... import config
-from .SinterBoxUtils import get_default_offset, middle, mid_point, create_brep_shell_box, create_gaps, FeatureValues
+from .SinterBoxUtils import get_default_offset, middle, mid_point, create_brep_shell_box, create_gaps, FeatureValues, \
+    bounding_box_from_selections, get_design
 
 app = adsk.core.Application.get()
 ui = app.userInterface
@@ -32,7 +33,7 @@ class Direction:
 
 class SinterBoxDefinition:
     def __init__(self, b_box: adsk.core.BoundingBox3D, inputs: adsk.core.CommandInputs):
-        design: adsk.fusion.Design = app.activeProduct
+        design = get_design()
         root_comp = design.rootComponent
 
         self.b_box = b_box
@@ -49,9 +50,9 @@ class SinterBoxDefinition:
         self.z_neg_vector.scaleBy(-1)
 
         self.inputs = inputs
-        self.thickness_input = inputs.itemById('thick_input')
-        self.gap_input = inputs.itemById('gap')
-        self.bar_input = inputs.itemById('bar')
+        self.thickness_input: adsk.core.ValueCommandInput = inputs.itemById('thick_input')
+        self.gap_input: adsk.core.ValueCommandInput = inputs.itemById('gap')
+        self.bar_input: adsk.core.ValueCommandInput = inputs.itemById('bar')
 
         default_offset = get_default_offset()
         self.feature_values = FeatureValues(
@@ -75,6 +76,13 @@ class SinterBoxDefinition:
 
     def initialize_box(self, b_box):
         self.modified_b_box = b_box.copy()
+
+    def update_selections(self, selections):
+        self.selections = selections
+        _new_bounding_box = bounding_box_from_selections(selections)
+        self.initialize_box(_new_bounding_box)
+        self.update_manipulators()
+        self.expand_box_in_directions()
 
     def update_box(self, point: adsk.core.Point3D):
         self.modified_b_box.expand(point)
@@ -152,7 +160,7 @@ class SinterBoxDefinition:
                 entity.deleteMe()
 
     def create_brep(self) -> adsk.fusion.Occurrence:
-        design: adsk.fusion.Design = app.activeProduct
+        design = get_design()
         root_comp = design.rootComponent
 
         new_occ: adsk.fusion.Occurrence = root_comp.occurrences.addNewComponent(adsk.core.Matrix3D.create())

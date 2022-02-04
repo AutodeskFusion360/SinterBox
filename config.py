@@ -1,7 +1,6 @@
 # Application Global Variables
 # This module serves as a way to share variables across different
 # modules (global variables).
-
 import os
 
 # Flag that indicates to run in Debug mode or not. When running in Debug mode
