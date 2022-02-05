@@ -10,13 +10,14 @@
 #  UNINTERRUPTED OR ERROR FREE.
 
 import math
-from typing import List
 from dataclasses import dataclass
+from typing import List
 
 import adsk.core
 import adsk.fusion
 
 from ... import config
+from ...lib import fusion360utils as futil
 
 app = adsk.core.Application.get()
 ui = app.userInterface
@@ -61,6 +62,13 @@ def oriented_b_box_from_b_box(b_box: adsk.core.BoundingBox3D) -> adsk.core.Orien
     )
     return o_box
 
+
+#
+# def oriented_bounding_box_principal_axis(body: adsk.fusion.BRepBody) -> adsk.core.OrientedBoundingBox3D:
+#     (returnValue, xAxis, yAxis, zAxis) = body.physicalProperties.getPrincipalAxes()
+#     (returnValue, rx, ry, rz) = body.physicalProperties.getRotationToPrincipal()
+#     returnValue = matrix3D_var.setToAlignCoordinateSystems(fromOrigin, fromXAxis, fromYAxis, fromZAxis, toOrigin,
+#                                                            toXAxis, toYAxis, toZAxis)
 
 def bounding_box_from_selections(selections):
     if len(selections) > 0:
@@ -218,10 +226,41 @@ def auto_gaps(selections, modified_b_box, thickness_value, bar_value):
         main_box_max_gap = thickness_value
 
     body_max_gaps = []
+
+    temp_brep_mgr = adsk.fusion.TemporaryBRepManager.get()
+
+    # TODO could cache results if proves slow
     body: adsk.fusion.BRepBody
     for body in selections:
-        body_o_box = oriented_b_box_from_b_box(body.boundingBox)
+
+        t_body = temp_brep_mgr.copy(body)
+        physical_props = body.getPhysicalProperties(adsk.fusion.CalculationAccuracy.MediumCalculationAccuracy)
+        (returnValue, xAxis, yAxis, zAxis) = physical_props.getPrincipalAxes()
+        # (returnValue, rx, ry, rz) = t_body.physicalProperties.getRotationToPrincipal()
+        com = physical_props.centerOfMass
+        matrix = adsk.core.Matrix3D.create()
+
+        # futil.log(f'zAxis {str(zAxis.asArray())}')
+        # futil.log(f'yAxis {str(yAxis.asArray())}')
+        # futil.log(f'xAxis {str(xAxis.asArray())}')
+        # futil.log(f'matrix 1 {str(matrix.asArray())}')
+
+        returnValue = matrix.setToAlignCoordinateSystems(
+            com, xAxis, yAxis, zAxis, com,
+            body.parentComponent.xConstructionAxis.geometry.direction,
+            body.parentComponent.yConstructionAxis.geometry.direction,
+            body.parentComponent.zConstructionAxis.geometry.direction
+        )
+
+        # futil.log(f'matrix 2 {str(matrix.asArray())}')
+
+        temp_brep_mgr.transform(t_body, matrix)
+
+        body_o_box = oriented_b_box_from_b_box(t_body.boundingBox)
+
         body_sides = [body_o_box.length, body_o_box.width, body_o_box.height]
+        # futil.log(f'body_sides {str(body_sides)}')
+
         body_sides.sort(key=float)
         a = body_sides[0]
         b = body_sides[1]
@@ -255,4 +294,3 @@ def auto_gaps(selections, modified_b_box, thickness_value, bar_value):
 def get_design() -> adsk.fusion.Design:
     design = app.activeDocument.products.itemByProductType('DesignProductType')
     return design
-

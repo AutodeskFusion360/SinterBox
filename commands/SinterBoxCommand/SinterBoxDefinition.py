@@ -189,11 +189,13 @@ class SinterBoxDefinition:
 
             base_feature = new_comp.features.baseFeatures.add()
             base_feature.startEdit()
-            new_comp.bRepBodies.add(shell_box, base_feature)
+            new_body = new_comp.bRepBodies.add(shell_box, base_feature)
+            new_body.name = 'Sinterbox'
             base_feature.finishEdit()
 
         else:
-            new_comp.bRepBodies.add(shell_box)
+            new_body = new_comp.bRepBodies.add(shell_box)
+            new_body.name = 'Sinterbox'
 
         return new_occ
 

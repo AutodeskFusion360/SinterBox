@@ -156,8 +156,9 @@ def command_execute(args: adsk.core.CommandEventArgs):
     if new_component_input.value:
         body: adsk.fusion.BRepBody
         for body in selection_bodies:
-            body.copyToComponent(new_occurrence)
-
+            new_body = body.copyToComponent(new_occurrence)
+            # TODO think about Occurrences
+            # new_body.name = f'{body.parentComponent.name} - {body.name}'
         for body in selection_bodies:
             if body.isValid:
                 if is_parametric:
@@ -167,7 +168,8 @@ def command_execute(args: adsk.core.CommandEventArgs):
                     body.deleteMe()
 
     if is_parametric:
-        design.timeline.timelineGroups.add(group_start_index, group_end_index)
+        t_group = design.timeline.timelineGroups.add(group_start_index, group_end_index)
+        t_group.name = 'Sinterbox'
 
 
 def command_preview(args: adsk.core.CommandEventArgs):
